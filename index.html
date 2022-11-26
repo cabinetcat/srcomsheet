@@ -41,14 +41,14 @@ while(true){
                 if(run.category.data.type == "per-level")
                 {
                     for (let i = 0; i < Object.keys(run.values).length; i++) {
-                        if (variableobj[run.category.data.id].indexOf(run.values[i]) > -1) // check if the run contains the variable, if not discard run
-                        {
-                            if (variableobj[null].indexOf(run.values[i]) > -1) // check if the run contains the variable, if not discard run
-                        {
+                        //if (variableobj[run.category.data.id].indexOf(run.values[i]) > -1) // check if the run contains the variable, if not discard run
+                        //{
+                            //if (variableobj[null].indexOf(run.values[i]) > -1) // check if the run contains the variable, if not discard run
+                        //{
 
-                        }
+                        //}
                             rundata.push(run);
-                        }
+                        //}
 
                     }
                 }
@@ -97,12 +97,13 @@ while(true){
             })
             vals.push()
         })
-        let components = [run.untieddays,`${fmtMSS(run.times.primary_t)} ${run.level.data.name} ${run.category.data.name} ${vals.join(' ')}`, run.date ,getplayers(run).join(', '), getplayers(run.slayer).join(', '), run.slayer.date]
+        let components = [run.untieddays,`${fmtMSS(run.times.primary_t)} ${run.level.data.name} ${vals.join(' ')} ${run.category.data.name}`, run.date ,getplayers(run).join(', '), getplayers(run.slayer).join(', '), run.slayer.date]
         return components.join(';')
     }
     function calculateruns() {
         rundata.sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
         rundata.forEach(function(run) {
+           // console.log(JSON.stringify(run.values))
             for (let i = 0; i < boards.length+1; i++) {
                 if (boards.length == i) {
                     boards.push([run])
