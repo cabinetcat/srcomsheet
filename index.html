@@ -2,143 +2,203 @@
 <script>
 var combos = []
 var boards = []
-var game = "9d3rzyed"
+var game = "3dx2jk51"
 var offset = 0
 var runsurl
 var gameurl = `https://www.speedrun.com/api/v1/games/${game}?embed=variables`
+var count_nonsubcategories = false
 var gamedata
 var levelvariables = 0
-var variableobj = {}
+var variableobj = {
+    'global' : []
+}
 var rundata = []
+var non_subcategories = [];
 $.ajax({
 
     url: gameurl,
     async: false,
     success: function(data) {
         gamedata = data;
+        gamedata.data.variables.data.forEach(function(variable) {
+            if (!variable["is-subcategory"] && !count_nonsubcategories) {
+                non_subcategories.push(variable.id);
+            }
+
+        });
     }
-});
+});  
 gamedata.data.variables.data.forEach(function(variable) {
-    if(variable.scope != "full-game" && variable["is-subcategory"] == true)
-    {
-        if (variableobj[variable.category] == null)
-        {
-            variableobj[variable.category] = []
-        }
-        variableobj[variable.category] = variable.id;
+    if(variable.scope != "full-game" && (variable["is-subcategory"] ^ count_nonsubcategories)) {
+        let varid = variable.category ? variable.category.id : 'global';
+        variableobj[varid] = variableobj[varid] ? variableobj[varid]: [];
+        variableobj[variable.category? variable.category.id : 'global'].push(variable.id);
     }
 })
-while(true){
-    let pagination
-    runsurl = `https://www.speedrun.com/api/v1/runs?game=${game}&offset=${offset}&status=verified&embed=category,level,players`
-    $.ajax({
-        
-        url: runsurl,
-        async: false,
-        success: function(data) {
-            data.data.forEach(function(run) {
-                //console.log(`${fmtMSS(run.times.primary_t)} ${run.level.data.name} ${run.category.data.name}`)
-                if(run.category.data.type == "per-level")
-                {
-                    for (let i = 0; i < Object.keys(run.values).length; i++) {
-                        //if (variableobj[run.category.data.id].indexOf(run.values[i]) > -1) // check if the run contains the variable, if not discard run
-                        //{
-                            //if (variableobj[null].indexOf(run.values[i]) > -1) // check if the run contains the variable, if not discard run
-                        //{
+getruns()
+calculateruns()
+    function getruns() {
 
-                        //}
-                            rundata.push(run);
-                        //}
+        let pagesize = 1;
+        while (pagesize > 0) {
+            runsurl = `https://www.speedrun.com/api/v1/runs?game=${game}&offset=${offset}&status=verified&embed=category,level,players`
+            $.ajax({
 
-                    }
-                }
-            })
-            offset += 20
-            pagination = data.pagination.size
+            url: runsurl,
+            async: false,
+
+        }).done((response) => {
+            rundata = rundata.concat(filterrun(response));
+            pagesize = response.pagination.size
+        });
+    offset += 20
         }
-        
-    });
-        if (pagination < 20)
-            {
-                break
-            }
-}
-    calculateruns()
-    function fmtMSS(s){return(s-(s%=60))/60+(9<s?':':':0')+s}
-    function getplayers(run)
-    {
-        let players = []
-        run.players.data.forEach(function(player)
-        {
-            players.push((player.rel == "guest" ? player.name : player.names.international))
-        })
-        return players
     }
-    function parsetostr(run)
-    {
-        let vals = []
-        Object.keys(run.values).forEach(function(runvar) { 
-            gamedata.data.variables.data.some(function(gamevar) { 
-                if (runvar == gamevar.id)
-                {
-                    var foundit = Object.keys(gamevar.values.values).some(function(value)
-                    {
-                        if (run.values[runvar] == value)
-                        {
-                            vals.push(gamevar.values.values[value].label)
-                            return true
-                        }
+
+function filterrun(rundata)
+{
+            let filtered = [];
+            runsobject = rundata.data
+            runsobject.forEach(function(run) {
+                non_subcategories.forEach(function(variable) {
+                        delete run.values[variable] 
+
                     })
-                }
-                if(foundit)
-                {
-                    return true
+                //console.log(`${fmtMSS(run.times.primary_t)} ${run.level.data.name} ${run.category.data.name}`)
+                let cattype = run.category.data.type
+                let varsnum = (variableobj[run.category.id] ? variableobj[run.category.id] : 0)+ variableobj.global.length;
+                if (cattype == "per-level" && Object.keys(run.values).length == varsnum) {
+                    //if (variableobj[run.category.data.id].indexOf(run.values[i]) > -1) // check if the run contains the variable, if not discard run
+                    //{
+                    //if (variableobj[null].indexOf(run.values[i]) > -1) // check if the run contains the variable, if not discard run
+                    //{
+
+                    //}
+                    //delete this.run
+                    filtered.push(run);
+                    //}
+
                 }
             })
-            vals.push()
-        })
-        let components = [run.untieddays,`${fmtMSS(run.times.primary_t)} ${run.level.data.name} ${vals.join(' ')} ${run.category.data.name}`, run.date ,getplayers(run).join(', '), getplayers(run.slayer).join(', '), run.slayer.date]
-        return components.join(';')
-    }
-    function calculateruns() {
-        rundata.sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
-        rundata.forEach(function(run) {
-           // console.log(JSON.stringify(run.values))
-            for (let i = 0; i < boards.length+1; i++) {
-                if (boards.length == i) {
-                    boards.push([run])
-                    break
-                } else if (boards[i][0].category.data.id == run.category.data.id && boards[i][0].level.data.id == run.level.data.id && JSON.stringify(boards[i][0].values) == JSON.stringify(run.values)) {
-                    boards[i].push(run)
-                    break
-                }
-            }
-        })
-       for (let i = 0; i < boards.length; i++) {
-        boards[i].forEach(function(runa) {
-                let runbeaten = boards[i].some(function(runb) {
-                    if(runa.id != runb.id && runa.times.primary_t >= runb.times.primary_t)
-                    {
-                        let untiedms = Date.parse(runb.date) - Date.parse(runa.date)
-                        runa.untieddays = Math.round((untiedms < 0 ? 0 : untiedms) / (60*60*24*1000))
-                        runa['slayer'] = (untiedms <= 0 ? {players:{data:[{names:{international:"N/A"}}]}, date:"N/A"} : runb) 
-                        console.log(parsetostr(runa))
+            return filtered;
+        }
+function fmtMSS(s) {
+    return (s - (s %= 60)) / 60 + (9 < s ? ':' : ':0') + s
+}
+
+function getplayers(run) {
+    let players = []
+    run.players.data.forEach(function(player) {
+        players.push((player.rel == "guest" ? player.name : player.names.international))
+    })
+    return players
+}
+
+function parsetostr(run) {
+    let vals = []
+    Object.keys(run.values).forEach(function(runvar) {
+        gamedata.data.variables.data.some(function(gamevar) {
+            if (runvar == gamevar.id) {
+                var foundit = Object.keys(gamevar.values.values).some(function(value) {
+                    if (run.values[runvar] == value) {
+                        vals.push(gamevar.values.values[value].label)
                         return true
                     }
                 })
-                if (!runbeaten)
-                {
-                    today = new Date() 
-                    let untiedms = today.getTime() - Date.parse(runa.date)
-                    runa.untieddays = Math.round((untiedms < 0 ? 0 : untiedms) / (60*60*24*1000))
-                    runa['slayer'] = {players:{data:[{names:{international:""}}]}, date:""} 
+            }
+            if (foundit) {
+                return true
+            }
+        })
+        vals.push()
+    })
+    let components = [run.untieddays, `${fmtMSS(run.times.primary_t)} ${run.level.data.name} ${vals.join(' ')} ${run.category.data.name}`, run.date, getplayers(run).join(', '), getplayers(run.slayer).join(', '), run.slayer.date]
+    return components.join(';')
+}
+function belongsInBoard()
+{
+    var c = 0;
+    if (boards[i][0].category.data.id == run.category.data.id)
+    {
+        var a 
+    }
+    if (boards[i][0].level.data.id == run.level.data.id)
+    {
+
+    }
+    if (JSON.stringify(boards[i][0].values) == JSON.stringify(run.values))
+    {
+
+    }
+    if (c == 3)
+    {
+        return true;
+    }
+    return false;
+
+}
+function conditions(i, run){
+    return [
+            (boards[i][0].category.data.id == run.category.data.id), 
+            (boards[i][0].level.data.id == run.level.data.id), 
+            (JSON.stringify(boards[i][0].values) == JSON.stringify(run.values))
+        ];
+}
+function calculateruns() {
+    rundata.sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
+    rundata.forEach(function(run) {
+        // console.log(JSON.stringify(run.values))
+        for (let i = 0; i < boards.length + 1; i++) {
+            
+            if (boards.length == i) {
+                boards.push([run])
+                break
+            } else if (conditions(i, run).every(condition => condition)) {
+                boards[i].push(run)
+                break
+            }
+        }
+    })
+    for (let i = 0; i < boards.length; i++) {
+        boards[i].forEach(function(runa) {
+            let runbeaten = boards[i].some(function(runb) {
+                if (runa.id != runb.id && runa.times.primary_t >= runb.times.primary_t) {
+                    let untiedms = Date.parse(runb.date) - Date.parse(runa.date)
+                    runa.untieddays = Math.round((untiedms < 0 ? 0 : untiedms) / (60 * 60 * 24 * 1000))
+                    runa['slayer'] = (untiedms <= 0 ? {
+                        players: {
+                            data: [{
+                                names: {
+                                    international: "N/A"
+                                }
+                            }]
+                        },
+                        date: "N/A"
+                    } : runb)
                     console.log(parsetostr(runa))
+                    return true
                 }
             })
+            if (!runbeaten) {
+                today = new Date()
+                let untiedms = today.getTime() - Date.parse(runa.date)
+                runa.untieddays = Math.round((untiedms < 0 ? 0 : untiedms) / (60 * 60 * 24 * 1000))
+                runa['slayer'] = {
+                    players: {
+                        data: [{
+                            names: {
+                                international: ""
+                            }
+                        }]
+                    },
+                    date: ""
+                }
+                console.log(parsetostr(runa))
+            }
+        })
 
 
-     }
     }
-
+}
 
 </script>
